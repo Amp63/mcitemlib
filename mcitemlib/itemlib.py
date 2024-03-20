@@ -319,7 +319,6 @@ class Item:
             added_item.nbt['Slot'] = empty_slot
             index = get_insert_index(used_slots, empty_slot)
             item_list.insert(index, added_item)
-            print(item_list)
             return
 
         added_item.nbt['Slot'] = slot
