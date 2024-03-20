@@ -108,6 +108,15 @@ class Item:
         if item_id == 'written_book':
             self.nbt['tag']['author'] = 'pynbt'
             self.nbt['tag']['title'] = 'Written Book'
+    
+
+    def __repr__(self):
+        return f'Item({self.nbt.__repr__()})'
+    
+
+    def __str__(self):
+        return self.__repr__()
+    
 
     def clone(self):
         """
