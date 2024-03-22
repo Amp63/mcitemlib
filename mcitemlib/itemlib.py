@@ -3,8 +3,10 @@ A library for creating and editing Minecraft items using python.
 """
 
 import json
+import time
 import socket
-from typing import List
+import websocket
+from typing import List, Literal
 from mcitemlib.style import StyledString, ampersand_to_section_format
 
 
@@ -12,6 +14,14 @@ BOOK_ITEMS = {
     'minecraft:writable_book',
     'minecraft:written_book'
 }
+
+COL_WARN = '\x1b[33m'
+COL_RESET = '\x1b[0m'
+COL_SUCCESS = '\x1b[32m'
+COL_ERROR = '\x1b[31m'
+
+RECODE_PORT = 31372
+CODECLIENT_URL = 'ws://localhost:31375'
 
 
 class AutoDict:
@@ -437,25 +447,17 @@ class Item:
         return self._format_as_nbt(self.nbt.as_dict())
 
 
-    def send_to_recode(self) -> int:
+    def send_to_minecraft(self, method: Literal['recode', 'codeclient']) -> int:
         """
-        Send this item directly to Minecraft via the recode mod (https://modrinth.com/mod/recode)
-        """
-
-        data = json.dumps({'type': 'nbt', 'source': 'pynbt', 'data': self.get_nbt()}) + '\n'
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            s.connect(('127.0.0.1', 31372))
-        except ConnectionRefusedError:
-            print("""Error: Could not connect to recode item API. Possible problems:
-    - Minecraft is not open
-    - Recode is not installed (get it here: https://modrinth.com/mod/recode or join the discord here: https://discord.gg/GWxWtcwA2C)""")
-            s.close()
-            return -1
+        Builds this template and sends it to DiamondFire automatically.
         
-        s.send(data.encode('utf-8'))
-        s.close()
-        return 0
+        :param bool includeTags: If True, include item tags in code blocks. Otherwise omit them.
+        """
+        if method == 'recode':
+            return send_recode(self)
+        if method == 'codeclient':
+            return send_codeclient(self)
+        return -1
     
     
     # only works for templates; not really applicable here, but still saving the code in case i need it later
@@ -467,3 +469,69 @@ class Item:
     #     received = s.recv(8192)
     #     print(received)
     #     s.close()
+
+
+def send_recode(item: Item) -> int:
+    """
+    Sends a template to DiamondFire via recode item api.
+
+    :param str templateCode: The code for the template as a base64 string.
+    :param str name: The name of the template.
+    :param str author: The author of the template.
+
+    :return: status code
+        - `0` = Success
+        - `1` = Connection refused
+        - `2` = Other socket error
+    """
+    
+    data = {'type': 'nbt', 'source': f'mcitemlib - {item.get_name().to_string()}', 'data': item.get_nbt()}
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect(('localhost', RECODE_PORT))
+    except ConnectionRefusedError:
+        print(f"""{COL_ERROR}Could not connect to recode item API. Possible problems:
+    - Minecraft is not open
+    - Recode is not installed (get it here: https://modrinth.com/mod/recode or join the discord here: https://discord.gg/GWxWtcwA2C){COL_RESET}""")
+        s.close()
+        return 1
+    
+    s.send((str(data) + '\n').encode('utf-8'))
+    received = json.loads(s.recv(1024).decode())
+    status = received['status']
+    s.close()
+    time.sleep(0.5)
+
+    if status == 'success':
+        print(f'{COL_SUCCESS}Template sent to client successfully.{COL_RESET}')
+        return 0
+    error = received['error']
+    print(f'{COL_ERROR}Error sending template: {error}{COL_RESET}')
+    return 2
+
+
+def send_codeclient(item: Item) -> int:
+    try:
+        ws = websocket.WebSocket()
+        ws.connect(CODECLIENT_URL)
+        print(f'{COL_SUCCESS}Connected. {COL_WARN}Please run /auth in game.{COL_RESET}')
+        
+        ws.recv()  # auth response
+
+        command = f'give {item.get_nbt()}'
+        ws.send(command)
+        ws.close()
+
+        print(f'{COL_SUCCESS}Template sent to client successfully.{COL_RESET}')
+        return 0
+        
+    except Exception as e:
+        if isinstance(e, ConnectionRefusedError):
+            print(f'{COL_ERROR}Could not connect to CodeClient API. Possible problems:')
+            print(f'    - Minecraft is not open')
+            print(f'    - CodeClient is not installed (get it here: https://modrinth.com/mod/codeclient)')
+            print(f'    - CodeClient API is not enabled (enable it in CodeClient general settings)')
+            return 1
+        
+        print(f'Connection failed: {e}')
+        return 2

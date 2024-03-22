@@ -38,4 +38,4 @@ A library for creating and editing Minecraft items using python.
  - `get_tag`
  - `set_tag`
  - `get_nbt`
- - `send_to_recode`
+ - `send_to_minecraft`
