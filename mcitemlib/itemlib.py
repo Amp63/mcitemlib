@@ -79,6 +79,9 @@ class TypedInt:
     def __init__(self, value: int, type: str):
         self.value = value
         self.type = type
+    
+    def __repr__(self) -> str:
+        return f'{self.value}{self.type}'
 
 
 def get_insert_index(nums: List[int], target: int):
@@ -105,7 +108,10 @@ class _RawTagValue:
     def __init__(self, value):
         self.value = value
     
-    def __str__(self):
+    def __repr__(self) -> str:
+        return str(self.value)
+    
+    def __str__(self) -> str:
         return str(self.value)
 
 
