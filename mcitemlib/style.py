@@ -86,6 +86,13 @@ def ampersand_to_section_format(string: str) -> str:
     return ''.join(split_string)
 
 
+def snake_to_capitalized(string: str) -> str:
+    """
+    Converts a snake case string into a string of capitalized, space separated words.
+    """
+    return ' '.join([w.capitalize() for w in string.split('_')])
+
+
 class StyledSubstring:
     def __init__(self, text: str, color: str|None=None, bold: bool=False, italic: bool=False, underlined: bool=False, strikethrough: bool=False, obfuscated: bool=False):
         self.data = {

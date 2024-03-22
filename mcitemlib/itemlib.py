@@ -7,7 +7,7 @@ import time
 import socket
 import websocket
 from typing import List, Literal
-from mcitemlib.style import StyledString, ampersand_to_section_format
+from mcitemlib.style import StyledString, ampersand_to_section_format, snake_to_capitalized
 
 
 BOOK_ITEMS = {
@@ -171,6 +171,9 @@ class Item:
 
         :return: The name of the item.
         """
+        name = self.nbt['tag']['display']['name']
+        if isinstance(name, AutoDict):
+            return StyledString.from_string(snake_to_capitalized(self.nbt['id'][10:]))
         return self.nbt['tag']['display']['name']
 
 
