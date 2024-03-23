@@ -177,10 +177,10 @@ class Item:
 
         :return: The name of the item.
         """
-        name = self.nbt['tag']['display']['name']
+        name = self.nbt['tag']['display']['Name']
         if isinstance(name, AutoDict):
             return StyledString.from_string(snake_to_capitalized(self.nbt['id'][10:]))
-        return self.nbt['tag']['display']['name']
+        return self.nbt['tag']['display']['Name']
 
 
     def get_lore(self) -> List[StyledString]:
