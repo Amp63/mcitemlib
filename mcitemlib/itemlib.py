@@ -458,7 +458,7 @@ class Item:
 
     def send_to_minecraft(self, method: Literal['recode', 'codeclient']) -> int:
         """
-        Builds this template and sends it to DiamondFire automatically.
+        Builds this template and sends it to Minecraft automatically.
         
         :param bool includeTags: If True, include item tags in code blocks. Otherwise omit them.
         """
