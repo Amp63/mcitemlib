@@ -467,17 +467,6 @@ class Item:
         if method == 'codeclient':
             return send_codeclient(self)
         return -1
-    
-    
-    # only works for templates; not really applicable here, but still saving the code in case i need it later
-    # @staticmethod
-    # def receive_from_recode():
-    #     print('Waiting for item to be sent...')
-    #     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #     s.connect(('127.0.0.1', 31372))
-    #     received = s.recv(8192)
-    #     print(received)
-    #     s.close()
 
 
 def send_recode(item: Item) -> int:
