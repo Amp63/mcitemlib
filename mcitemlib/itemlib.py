@@ -71,7 +71,7 @@ class AutoDict:
         return self.data[key]
 
 
-class PyNbtException(Exception):
+class MCItemlibException(Exception):
     pass
 
 
@@ -213,7 +213,7 @@ class Item:
         :return: The item in the given slot.
         """
         if not 'shulker_box' in self.nbt['id']:
-            raise PyNbtException('Tried to access contents of non shulker box item.')
+            raise MCItemlibException('Tried to access contents of non shulker box item.')
         item_list = self.nbt['tag']['BlockEntityTag'].set_list('Items')
         used_slots = [item.nbt['Slot'] for item in item_list]
         if slot not in used_slots:
@@ -227,7 +227,7 @@ class Item:
         Get all book text from this item.
         """
         if self.nbt['id'] not in BOOK_ITEMS:
-            raise PyNbtException('Tried to get text from non-book item.')
+            raise MCItemlibException('Tried to get text from non-book item.')
         if 'pages' in self.nbt['tag'].data:
             return self.nbt['tag']['pages']
         return []
@@ -241,7 +241,7 @@ class Item:
         """
         if tag_name in self.nbt['tag'].data:
             return self.nbt['tag'][tag_name]
-        raise PyNbtException(f'Tag `{tag_name}` not found')
+        raise MCItemlibException(f'Tag `{tag_name}` not found')
     
 
     def set_id(self, id: str):
@@ -331,14 +331,14 @@ class Item:
             - If `-1`, sets the item in the next available slot in the box.
         """
         if not 'shulker_box' in self.nbt['id']:
-            raise PyNbtException('Tried to access contents of non shulker box item.')
+            raise MCItemlibException('Tried to access contents of non shulker box item.')
         item_list = self.nbt['tag']['BlockEntityTag'].set_list('Items')
         self.nbt['tag']['BlockEntityTag']['id'] = 'minecraft:shulker_box'
         added_item = item.clone()
         used_slots = [item.nbt['Slot'] for item in item_list]
         if slot == -1:
             if len(item_list) == 27:
-                raise PyNbtException('Cannot insert item into filled shulker box.')
+                raise MCItemlibException('Cannot insert item into filled shulker box.')
             empty_slot = 0
             for i in range(27):
                 if i not in used_slots:
@@ -365,7 +365,7 @@ class Item:
         :param List[str] pages: The page texts to set.
         """
         if self.nbt['id'] not in BOOK_ITEMS:
-            raise PyNbtException('Tried to write text to non-book item.')
+            raise MCItemlibException('Tried to write text to non-book item.')
         new_pages = [ampersand_to_section_format(t) for t in pages]
         self.nbt['tag']['pages'] = new_pages
     
@@ -379,7 +379,7 @@ class Item:
             - If `-1`, adds a new page to the end of the book.
         """
         if self.nbt['id'] not in BOOK_ITEMS:
-            raise PyNbtException('Tried to write text to non-book item.')
+            raise MCItemlibException('Tried to write text to non-book item.')
         page_list = self.nbt['tag'].set_list('pages')
         if page_number == -1:
             page_list.append(ampersand_to_section_format(page_text))
@@ -389,13 +389,13 @@ class Item:
 
     def set_book_author(self, author: str):
         if self.nbt['id'] not in BOOK_ITEMS:
-            raise PyNbtException('Tried to write to non-book item.')
+            raise MCItemlibException('Tried to write to non-book item.')
         self.nbt['tag']['author'] = author
     
 
     def set_book_title(self, title: str):
         if self.nbt['id'] not in BOOK_ITEMS:
-            raise PyNbtException('Tried to write to non-book item.')
+            raise MCItemlibException('Tried to write to non-book item.')
         self.nbt['tag']['title'] = title
 
 
@@ -446,7 +446,7 @@ class Item:
         if isinstance(value, Item):
             return value.get_nbt()
         
-        raise PyNbtException(f'_format_as_nbt received an unexpected type `{type(value)}`')
+        raise MCItemlibException(f'_format_as_nbt received an unexpected type `{type(value)}`')
     
 
     def get_nbt(self) -> str:
