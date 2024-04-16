@@ -7,7 +7,7 @@ import json
 from typing import List, Any
 
 
-class PyNbtStyleException(Exception):
+class McItemlibStyleException(Exception):
     pass
 
 STYLE_CODE_REGEX = r'(&([0-9A-Fa-fklmnorKLMNOR]|x&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]))+'
@@ -153,7 +153,7 @@ class StyledSubstring:
                 sub.data['color'] = f'#{raw_code[i+1:i+7].upper()}'
                 i += 6
             else:
-                raise PyNbtStyleException(f'Unexpected format character "{c}" found in substring.')
+                raise McItemlibStyleException(f'Unexpected format character "{c}" found in substring.')
             i += 1
         return sub
     
@@ -244,9 +244,9 @@ class StyledString:
             nbt_dict = json.loads(nbt)
             if 'text' in nbt_dict:
                 return StyledString.from_nbt_dict(nbt_dict)
-            raise PyNbtStyleException('String is not a formatted styled string.')
+            raise McItemlibStyleException('String is not a formatted styled string.')
         except json.JSONDecodeError:
-            raise PyNbtStyleException('Invalid JSON string.')
+            raise McItemlibStyleException('Invalid JSON string.')
         
 
     def to_string(self) -> str:
@@ -259,7 +259,7 @@ class StyledString:
     def format(self):
         amount_substrings = len(self.substrings)
         if amount_substrings == 0:
-            raise PyNbtStyleException('Cannot format styled string without any substrings.')
+            raise McItemlibStyleException('Cannot format styled string without any substrings.')
         if amount_substrings == 1:
             return self.substrings[0].format()
 

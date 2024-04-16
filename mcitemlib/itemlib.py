@@ -8,7 +8,7 @@ import socket
 import websocket
 import nbtlib
 from typing import List, Literal
-from mcitemlib.style import StyledString, ampersand_to_section_format, snake_to_capitalized, PyNbtStyleException
+from mcitemlib.style import StyledString, ampersand_to_section_format, snake_to_capitalized, McItemlibStyleException
 
 
 BOOK_ITEMS = {
@@ -577,6 +577,6 @@ def convert_nbt_tag(nbt_tag: nbtlib.Base):
     elif isinstance(nbt_tag, nbtlib.String):
         try:
             return StyledString.from_nbt(nbt_tag.unpack())
-        except PyNbtStyleException:
+        except McItemlibStyleException:
             return nbt_tag.unpack()
     return nbt_tag.unpack()
