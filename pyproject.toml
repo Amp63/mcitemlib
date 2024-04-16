@@ -5,7 +5,7 @@ description = "A library for creating and editing Minecraft items using python."
 authors = ["Amp"]
 license = "MIT"
 readme = "README.md"
-keywords=["minecraft", "item", "block"]
+keywords=["minecraft", "item", "block", "nbt"]
 repository = "https://github.com/Amp63/mcitemlib"
 
 [tool.poetry.dependencies]
