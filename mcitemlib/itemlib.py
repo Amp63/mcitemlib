@@ -139,12 +139,11 @@ class Item:
             self.nbt['tag']['title'] = 'Written Book'
     
 
-    @staticmethod
-    def from_nbt(nbt: str):
-        i = Item('stone')
-        print(nbtlib.parse_nbt(nbt))
-        nbt = convert_nbt_tag(nbtlib.parse_nbt(nbt))
-        i.nbt = nbt
+    @classmethod
+    def from_nbt(cls, nbt: str):
+        i = cls('stone')
+        nbt_dict = convert_nbt_tag(nbtlib.parse_nbt(nbt))
+        i.nbt = nbt_dict
         return i
     
 
