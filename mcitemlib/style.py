@@ -3,7 +3,8 @@ Functions related to styling text.
 """
 
 import re
-from typing import List
+import json
+from typing import List, Any
 
 
 class PyNbtStyleException(Exception):
@@ -42,6 +43,24 @@ KEPT_FORMATTING = {
     'text',
     'italic',
 }
+
+
+def _some_or(value: Any, none_value: Any):
+    """
+    Returns `none_value` if `value` is None, otherwise returns `value`.
+    """
+    if value is None:
+        return none_value
+    return value
+
+
+def _add_new_keys(d1: dict, d2: dict):
+    """
+    Sets keys from `d2` into `d1` but only if the key doesn't already exist in `d1`.
+    """
+    for k, v in d2.items():
+        if k not in d1:
+            d1[k] = v
 
 
 def _add_quote_escapes(string: str):
@@ -137,6 +156,20 @@ class StyledSubstring:
                 raise PyNbtStyleException(f'Unexpected format character "{c}" found in substring.')
             i += 1
         return sub
+    
+
+    @staticmethod
+    def from_nbt(nbt: str|dict):
+        style_data = nbt
+        if isinstance(nbt, str):
+            style_data = json.loads(nbt)
+        bold = _some_or(style_data.get('bold'), False)
+        italic = _some_or(style_data.get('italic'), False)
+        underlined = _some_or(style_data.get('underlined'), False)
+        strikethrough = _some_or(style_data.get('strikethrough'), False)
+        obfuscated = _some_or(style_data.get('obfuscated'), False)
+
+        return StyledSubstring(style_data['text'], style_data.get('color'), bold, italic, underlined, strikethrough, obfuscated)
 
     
     def format(self) -> str:
@@ -154,7 +187,7 @@ class StyledString:
     
 
     def __repr__(self):
-        return f'StyledString([{self.substrings}])'
+        return f'StyledString({self.substrings})'
 
 
     @staticmethod
@@ -186,6 +219,35 @@ class StyledString:
     def from_string(string: str):
         return StyledString([StyledSubstring(string)])
     
+
+    @staticmethod
+    def from_nbt_dict(nbt_dict: dict):
+        if 'extra' in nbt_dict:
+            substrings = []
+            extra = nbt_dict['extra']
+            outside_extra = {k: v for k, v in nbt_dict.items() if k != 'extra'}
+            if nbt_dict['text'] != '':
+                substrings = [StyledSubstring.from_nbt(outside_extra)]
+            for substring_dict in extra:
+                if isinstance(substring_dict, str):
+                    substring_dict = {'text': substring_dict}
+                _add_new_keys(substring_dict, outside_extra)
+                substrings.extend(StyledString.from_nbt_dict(substring_dict).substrings)
+            return StyledString(substrings)
+
+        return StyledString([StyledSubstring.from_nbt(nbt_dict)])
+    
+
+    @staticmethod
+    def from_nbt(nbt: str):
+        try:
+            nbt_dict = json.loads(nbt)
+            if 'text' in nbt_dict:
+                return StyledString.from_nbt_dict(nbt_dict)
+            raise PyNbtStyleException('String is not a formatted styled string.')
+        except json.JSONDecodeError:
+            raise PyNbtStyleException('Invalid JSON string.')
+        
 
     def to_string(self) -> str:
         """

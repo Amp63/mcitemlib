@@ -6,8 +6,9 @@ import json
 import time
 import socket
 import websocket
+import nbtlib
 from typing import List, Literal
-from mcitemlib.style import StyledString, ampersand_to_section_format, snake_to_capitalized
+from mcitemlib.style import StyledString, ampersand_to_section_format, snake_to_capitalized, PyNbtStyleException
 
 
 BOOK_ITEMS = {
@@ -31,7 +32,17 @@ class AutoDict:
 
     def __init__(self, d: dict):
         self.data = d
+    
 
+    @staticmethod
+    def from_dict(d: dict):
+        auto_dict = AutoDict({})
+        for k, v in d.items():
+            if isinstance(v, dict):
+                auto_dict[k] = AutoDict.from_dict(v)
+            else:
+                auto_dict[k] = v
+        return auto_dict
 
     def __repr__(self):
         return str(self.data)
@@ -56,6 +67,8 @@ class AutoDict:
         for key, value in self.data.items():
             if isinstance(value, AutoDict):
                 new_dict[key] = value.as_dict()
+            elif isinstance(value, list):
+                new_dict[key] = [v.as_dict() if isinstance(v, AutoDict) else v for v in value]
             else:
                 new_dict[key] = value
         return new_dict
@@ -75,7 +88,7 @@ class MCItemlibException(Exception):
     pass
 
 
-class TypedInt:
+class _TypedInt:
     def __init__(self, value: int, type: str):
         self.value = value
         self.type = type
@@ -126,6 +139,15 @@ class Item:
             self.nbt['tag']['title'] = 'Written Book'
     
 
+    @staticmethod
+    def from_nbt(nbt: str):
+        i = Item('stone')
+        print(nbtlib.parse_nbt(nbt))
+        nbt = convert_nbt_tag(nbtlib.parse_nbt(nbt))
+        i.nbt = nbt
+        return i
+    
+
     def __repr__(self):
         return f'Item({self.nbt.__repr__()})'
     
@@ -153,13 +175,13 @@ class Item:
         return self.nbt['id']
     
 
-    def get_count(self) -> str:
+    def get_count(self) -> int:
         """
         Get the count of this item.
 
         :return: The count of this item.
         """
-        return self.nbt['Count']
+        return self.nbt['Count'].value
     
 
     def get_durability(self) -> int:
@@ -259,7 +281,7 @@ class Item:
 
         :param int count: The count to set.
         """
-        self.nbt['Count'] = count
+        self.nbt['Count'] = _TypedInt(count, 'b')
     
 
     def set_durability(self, damage: int):
@@ -319,7 +341,7 @@ class Item:
         :param int enchant_level: The level of the enchantment to set.
         """
         self.nbt['tag'].set_list('Enchantments')
-        self.nbt['tag']['Enchantments'].append({'id': f'minecraft:{enchant_id}', 'lvl': TypedInt(enchant_level, 's')})
+        self.nbt['tag']['Enchantments'].append({'id': f'minecraft:{enchant_id}', 'lvl': _TypedInt(enchant_level, 's')})
     
 
     def set_shulker_box_item(self, item, slot: int=-1):
@@ -416,7 +438,7 @@ class Item:
         if isinstance(value, int):
             return f'{value}b'
         
-        if isinstance(value, TypedInt):
+        if isinstance(value, _TypedInt):
             return f'{value.value}{value.type}'
 
         if isinstance(value, float):
@@ -468,7 +490,7 @@ class Item:
             return send_codeclient(self)
         return -1
 
-
+# TODO: change "template sent successfully" message into a more generic item sent message
 def send_recode(item: Item) -> int:
     """
     Sends a template to DiamondFire via recode item api.
@@ -533,3 +555,29 @@ def send_codeclient(item: Item) -> int:
         
         print(f'Connection failed: {e}')
         return 2
+
+
+def convert_nbt_tag(nbt_tag: nbtlib.Base):
+    """
+    Converts nbtlib tags into mcitemlib objects
+    """
+    if isinstance(nbt_tag, nbtlib.Compound):
+        unpacked = nbt_tag.unpack()
+        if 'text' in unpacked:
+            return StyledString.from_nbt_dict(unpacked)
+        new_tag = {}
+        for k, v in nbt_tag.items():
+            if ':' in k:    # bad fix for Diamondfire custom item tags
+                k = _RawTagValue(f'"{k}"')
+            new_tag[k] = convert_nbt_tag(v)
+        return AutoDict(new_tag)
+    elif isinstance(nbt_tag, nbtlib.List):
+        return [convert_nbt_tag(t) for t in nbt_tag]
+    elif isinstance(nbt_tag, nbtlib.Numeric):
+        return _TypedInt(nbt_tag.unpack(), nbt_tag.suffix)
+    elif isinstance(nbt_tag, nbtlib.String):
+        try:
+            return StyledString.from_nbt(nbt_tag.unpack())
+        except PyNbtStyleException:
+            return nbt_tag.unpack()
+    return nbt_tag.unpack()
