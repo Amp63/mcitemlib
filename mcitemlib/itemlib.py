@@ -7,6 +7,7 @@ import time
 import socket
 import websocket
 import nbtlib
+import numpy
 from typing import List, Literal
 from mcitemlib.style import StyledString, ampersand_to_section_format, snake_to_capitalized, McItemlibStyleException
 
@@ -466,6 +467,9 @@ class Item:
 
         if isinstance(value, Item):
             return value.get_nbt()
+        
+        if isinstance(value, numpy.ndarray):
+            return f'[I;{",".join(str(i) for i in value)}]'
         
         raise MCItemlibException(f'_format_as_nbt received an unexpected type `{type(value)}`')
     
