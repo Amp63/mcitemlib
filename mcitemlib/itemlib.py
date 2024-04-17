@@ -515,7 +515,7 @@ def send_recode(item: Item, source: str='mcitemlib') -> int:
         s.close()
         return 1
     
-    s.send((str(data) + '\n').encode('utf-8'))
+    s.send((json.dumps(data) + '\n').encode('utf-8'))
     received = json.loads(s.recv(1024).decode())
     status = received['status']
     s.close()
