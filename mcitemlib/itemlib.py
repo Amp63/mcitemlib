@@ -490,7 +490,7 @@ class Item:
         return -1
 
 # TODO: change "template sent successfully" message into a more generic item sent message
-def send_recode(item: Item) -> int:
+def send_recode(item: Item, source: str='mcitemlib') -> int:
     """
     Sends a template to DiamondFire via recode item api.
 
@@ -504,7 +504,7 @@ def send_recode(item: Item) -> int:
         - `2` = Other socket error
     """
     
-    data = {'type': 'nbt', 'source': f'mcitemlib - {item.get_name().to_string()}', 'data': item.get_nbt()}
+    data = {'type': 'nbt', 'source': f'{source} - {item.get_name().to_string()}', 'data': item.get_nbt()}
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.connect(('localhost', RECODE_PORT))
