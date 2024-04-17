@@ -489,7 +489,7 @@ class Item:
             return send_codeclient(self)
         return -1
 
-# TODO: change "template sent successfully" message into a more generic item sent message
+
 def send_recode(item: Item, source: str='mcitemlib') -> int:
     """
     Sends a template to DiamondFire via recode item api.
@@ -522,10 +522,10 @@ def send_recode(item: Item, source: str='mcitemlib') -> int:
     time.sleep(0.5)
 
     if status == 'success':
-        print(f'{COL_SUCCESS}Template sent to client successfully.{COL_RESET}')
+        print(f'{COL_SUCCESS}Item sent to client successfully.{COL_RESET}')
         return 0
     error = received['error']
-    print(f'{COL_ERROR}Error sending template: {error}{COL_RESET}')
+    print(f'{COL_ERROR}Error sending item: {error}{COL_RESET}')
     return 2
 
 
@@ -541,7 +541,7 @@ def send_codeclient(item: Item) -> int:
         ws.send(command)
         ws.close()
 
-        print(f'{COL_SUCCESS}Template sent to client successfully.{COL_RESET}')
+        print(f'{COL_SUCCESS}Item sent to client successfully.{COL_RESET}')
         return 0
         
     except Exception as e:
