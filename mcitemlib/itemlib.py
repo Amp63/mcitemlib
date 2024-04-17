@@ -477,14 +477,14 @@ class Item:
         return self._format_as_nbt(self.nbt.as_dict())
 
 
-    def send_to_minecraft(self, method: Literal['recode', 'codeclient']) -> int:
+    def send_to_minecraft(self, method: Literal['recode', 'codeclient'], source: str='mcitemlib') -> int:
         """
         Builds this template and sends it to Minecraft automatically.
         
-        :param bool includeTags: If True, include item tags in code blocks. Otherwise omit them.
+        :param str source: The source program from which the item was sent.
         """
         if method == 'recode':
-            return send_recode(self)
+            return send_recode(self, source)
         if method == 'codeclient':
             return send_codeclient(self)
         return -1
