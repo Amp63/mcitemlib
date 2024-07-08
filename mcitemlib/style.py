@@ -242,6 +242,8 @@ class StyledString:
     def from_nbt(nbt: str):
         try:
             nbt_dict = json.loads(nbt)
+            if not isinstance(nbt_dict, dict):
+                raise McItemlibStyleException('Invalid JSON string.')
             if 'text' in nbt_dict:
                 return StyledString.from_nbt_dict(nbt_dict)
             raise McItemlibStyleException('String is not a formatted styled string.')

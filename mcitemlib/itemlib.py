@@ -205,6 +205,7 @@ class Item:
         return self.nbt['tag']['display']['Name']
 
 
+    # TODO: return empty list if lore doesnt exist
     def get_lore(self) -> List[StyledString]:
         """
         Get all lore on this item.
