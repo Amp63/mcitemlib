@@ -538,9 +538,7 @@ def send_codeclient(item: Item) -> int:
     try:
         ws = websocket.WebSocket()
         ws.connect(CODECLIENT_URL)
-        print(f'{COL_SUCCESS}Connected. {COL_WARN}Please run /auth in game.{COL_RESET}')
-        
-        ws.recv()  # auth response
+        print(f'{COL_SUCCESS}Connected.{COL_RESET}')
 
         command = f'give {item.get_nbt()}'
         ws.send(command)
