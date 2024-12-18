@@ -8,13 +8,13 @@ import socket
 import websocket
 import nbtlib
 import numpy
-from typing import List, Literal
+from typing import Literal
 from mcitemlib.style import StyledString, ampersand_to_section_format, snake_to_capitalized, McItemlibStyleException
 
 
 BOOK_ITEMS = {
-    'minecraft:writable_book',
-    'minecraft:written_book'
+    'minecraft:writable_book': 'minecraft:writable_book_content',
+    'minecraft:written_book': 'minecraft:written_book_content'
 }
 
 COL_WARN = '\x1b[33m'
@@ -98,7 +98,7 @@ class _TypedInt:
         return f'{self.value}{self.type}'
 
 
-def get_insert_index(nums: List[int], target: int):
+def get_insert_index(nums: list[int], target: int):
     left, right = 0, len(nums)
     while left < right:
         mid = left + (right - left) // 2
@@ -115,9 +115,9 @@ def _parse_text_parameter(string: str|StyledString):
     return string
 
 
-class _RawTagValue:
+class _RawValue:
     """
-    Represents a tag value that should be inserted into an nbt string exactly as is.
+    Represents a value that should be inserted into an nbt string exactly as is.
     """
     def __init__(self, value):
         self.value = value
@@ -132,12 +132,16 @@ class _RawTagValue:
 class Item:
     def __init__(self, item_id: str, count: int=1):
         self.nbt = AutoDict({
-            'id': f'minecraft:{item_id}',
-            'Count': count,
+            '~id': f'minecraft:{item_id}',
+            '~count': count,
         })
         if item_id == 'written_book':
-            self.nbt['tag']['author'] = 'pynbt'
-            self.nbt['tag']['title'] = 'Written Book'
+            content = AutoDict({
+                '~resolved': _TypedInt(1, 'b'),
+                '~author': 'mcitemlib',
+                '~title': {'~raw': 'Written Book'}
+            })
+            self.nbt['~components']['minecraft:written_book_content'] = content
     
 
     @classmethod
@@ -172,7 +176,7 @@ class Item:
 
         :return: The ID of this item.
         """
-        return self.nbt['id']
+        return self.nbt['~id']
     
 
     def get_count(self) -> int:
@@ -181,7 +185,7 @@ class Item:
 
         :return: The count of this item.
         """
-        return self.nbt['Count'].value
+        return self.nbt['~count']
     
 
     def get_durability(self) -> int:
@@ -190,7 +194,7 @@ class Item:
 
         :return: The damage done to this item
         """
-        return self.nbt['tag']['Damage']
+        return self.nbt['~components']['minecraft:damage']
 
 
     def get_name(self) -> StyledString:
@@ -199,32 +203,32 @@ class Item:
 
         :return: The name of the item.
         """
-        name = self.nbt['tag']['display']['Name']
+        name = self.nbt['~components']['minecraft:custom_name']
         if isinstance(name, AutoDict):
-            return StyledString.from_string(snake_to_capitalized(self.nbt['id'][10:]))
-        return self.nbt['tag']['display']['Name']
+            return StyledString.from_string(snake_to_capitalized(self.nbt['~id'][10:]))
+        return self.nbt['~components']['minecraft:custom_name']
 
 
     # TODO: return empty list if lore doesnt exist
-    def get_lore(self) -> List[StyledString]:
+    def get_lore(self) -> list[StyledString]:
         """
         Get all lore on this item.
 
         :return: A list of lore texts.
         """
-        return self.nbt['tag']['display']['Lore']
+        return self.nbt['~components']['minecraft:lore']
 
 
-    def get_enchantments(self) -> List:
+    def get_enchantments(self) -> dict:
         """
         Get a list of enchantments applied to this item.
 
         :return: A list of enchantment data.
-            - Format: `[{'id': <enchant id>, 'lvl': <enchant level>}]`
+            - Format: `[{<enchant id>, <enchant level>}]`
         """
-        if 'Enchantments' not in self.nbt['tag'].data:
-            return []
-        return self.nbt['tag']['Enchantments']
+        if 'minecraft:enchantments' not in self.nbt['~components'].data:
+            return {}
+        return self.nbt['~components']['minecraft:enchantments']['levels']
 
 
     def get_shulker_box_item(self, slot: int):
@@ -235,36 +239,38 @@ class Item:
 
         :return: The item in the given slot.
         """
-        if not 'shulker_box' in self.nbt['id']:
+        if not 'shulker_box' in self.nbt['~id']:
             raise MCItemlibException('Tried to access contents of non shulker box item.')
-        item_list = self.nbt['tag']['BlockEntityTag'].set_list('Items')
-        used_slots = [item.nbt['Slot'] for item in item_list]
+        item_list = self.nbt['~components'].set_list('minecraft:container')
+        used_slots = [item.nbt['slot'] for item in item_list]
         if slot not in used_slots:
             return Item('air')
         index = used_slots.index(slot)
         return item_list[index]
 
 
-    def get_book_text(self) -> List[str]:
+    def get_book_text(self) -> list[str]:
         """
         Get all book text from this item.
         """
-        if self.nbt['id'] not in BOOK_ITEMS:
+        page_tag = BOOK_ITEMS.get(self.nbt['~id'])
+        if page_tag is None:
             raise MCItemlibException('Tried to get text from non-book item.')
-        if 'pages' in self.nbt['tag'].data:
-            return self.nbt['tag']['pages']
-        return []
+        if page_tag not in self.nbt['~components'].data:
+            return []
+        pages = self.nbt['~components'][page_tag]['~pages']
+        return [p['~raw'] for p in pages]
 
 
-    def get_tag(self, tag_name: str):
+    def get_custom_data(self, key: str):
         """
-        Get a tag value from the tag directory of this item.
+        Get a data value from the `custom_data` directory of this item.
 
-        :param str tag_name: The name of the tag to access.
+        :param str key: The name of the tag to access.
         """
-        if tag_name in self.nbt['tag'].data:
-            return self.nbt['tag'][tag_name]
-        raise MCItemlibException(f'Tag `{tag_name}` not found')
+        if key in self.nbt['~components']['minecraft:custom_data'].data:
+            return self.nbt['~components']['minecraft:custom_data'][key]
+        raise MCItemlibException(f'Key `{key}` not found')
     
 
     def set_id(self, id: str):
@@ -273,7 +279,7 @@ class Item:
 
         :param str id: The ID to set.
         """
-        self.nbt['id'] = id
+        self.nbt['~id'] = id
     
     
     def set_count(self, count: int):
@@ -282,7 +288,7 @@ class Item:
 
         :param int count: The count to set.
         """
-        self.nbt['Count'] = _TypedInt(count, 'b')
+        self.nbt['~count'] = count
     
 
     def set_durability(self, damage: int):
@@ -292,7 +298,7 @@ class Item:
         :param int damage: The amount of damage to set.
             - Higher damage = less durability
         """
-        self.nbt['tag']['Damage'] = damage
+        self.nbt['~components']['minecraft:damage'] = damage
     
 
     def set_name(self, name: str|StyledString):
@@ -301,16 +307,16 @@ class Item:
 
         :param str|StyledString name: The name to set.
         """
-        self.nbt['tag']['display']['Name'] = _parse_text_parameter(name)
+        self.nbt['~components']['minecraft:custom_name'] = _parse_text_parameter(name)
     
 
-    def set_lore(self, lore_lines: List[str]|List[StyledString]):
+    def set_lore(self, lore_lines: list[str]|list[StyledString]):
         """
         Set all lore lines for this item.
 
-        :param List[str]|List[StyledString] lore_lines: The lore texts to set.
+        :param list[str]|list[StyledString] lore_lines: The lore texts to set.
         """
-        self.nbt['tag']['display']['Lore'] = [_parse_text_parameter(l) for l in lore_lines]
+        self.nbt['~components']['minecraft:lore'] = [_parse_text_parameter(l) for l in lore_lines]
     
 
     def set_lore_line(self, lore_text: str|StyledString, lore_line: int=-1):
@@ -321,8 +327,8 @@ class Item:
         :param int lore_line: The line to set the text.
             - If `-1`, the text will be added to the end of the lore list.
         """
-        self.nbt['tag']['display'].set_list('Lore')
-        lore_list = self.nbt['tag']['display']['Lore']
+        self.nbt['~components'].set_list('minecraft:lore')
+        lore_list = self.nbt['~components']['minecraft:lore']
 
         parsed_lore_text = _parse_text_parameter(lore_text)
         if lore_line == -1:
@@ -341,11 +347,10 @@ class Item:
         :param str enchant_id: The ID of the enchantment to set.
         :param int enchant_level: The level of the enchantment to set.
         """
-        self.nbt['tag'].set_list('Enchantments')
-        self.nbt['tag']['Enchantments'].append({'id': f'minecraft:{enchant_id}', 'lvl': _TypedInt(enchant_level, 's')})
+        self.nbt['~components']['minecraft:enchantments']['levels'][f'minecraft:{enchant_id}'] = enchant_level
     
 
-    def set_shulker_box_item(self, item, slot: int=-1):
+    def set_shulker_box_item(self, item: "Item", slot: int=-1):
         """
         Set an item in this shulker box.
 
@@ -353,12 +358,11 @@ class Item:
         :param int slot: The slot to set the item in.
             - If `-1`, sets the item in the next available slot in the box.
         """
-        if not 'shulker_box' in self.nbt['id']:
+        if not 'shulker_box' in self.nbt['~id']:
             raise MCItemlibException('Tried to access contents of non shulker box item.')
-        item_list = self.nbt['tag']['BlockEntityTag'].set_list('Items')
-        self.nbt['tag']['BlockEntityTag']['id'] = 'minecraft:shulker_box'
+        item_list = self.nbt['~components'].set_list('minecraft:container')
         added_item = item.clone()
-        used_slots = [item.nbt['Slot'] for item in item_list]
+        used_slots = [item.nbt['~slot'] for item in item_list]
         if slot == -1:
             if len(item_list) == 27:
                 raise MCItemlibException('Cannot insert item into filled shulker box.')
@@ -367,30 +371,35 @@ class Item:
                 if i not in used_slots:
                     empty_slot = i
                     break
-            added_item.nbt['Slot'] = empty_slot
+            container_item_data = {'~slot': empty_slot, '~item': added_item}
             index = get_insert_index(used_slots, empty_slot)
-            item_list.insert(index, added_item)
+            item_list.insert(index, container_item_data)
             return
 
-        added_item.nbt['Slot'] = slot
+        container_item_data = {'~slot': slot, '~item': added_item}
         if slot in used_slots:
             index = used_slots.index(slot)
-            item_list[index] = added_item
+            item_list[index] = container_item_data
         else:
             index = get_insert_index(used_slots, slot)
-            item_list.insert(index, added_item)
+            item_list.insert(index, container_item_data)
     
 
-    def set_book_text(self, pages: List[str]):
+    def set_book_text(self, pages: list[str]):
         """
         Set all pages in this book.
 
-        :param List[str] pages: The page texts to set.
+        :param list[str] pages: The page texts to set.
         """
-        if self.nbt['id'] not in BOOK_ITEMS:
+        item_id = self.nbt['~id']
+        page_tag = BOOK_ITEMS.get(item_id)
+        if page_tag is None:
             raise MCItemlibException('Tried to write text to non-book item.')
-        new_pages = [ampersand_to_section_format(t) for t in pages]
-        self.nbt['tag']['pages'] = new_pages
+        if item_id == 'minecraft:written_book':
+            formatted_pages = [{'~raw': f"'{ampersand_to_section_format(p).replace('\n', '\\\\n')}'"} for p in pages]
+        else:
+            formatted_pages = [{'~raw': ampersand_to_section_format(p)} for p in pages]
+        self.nbt['~components'][page_tag]['~pages'] = formatted_pages
     
 
     def set_book_page(self, page_text: str, page_number: int=-1):
@@ -401,43 +410,57 @@ class Item:
         :param int page_number: The page number to set the text on.
             - If `-1`, adds a new page to the end of the book.
         """
-        if self.nbt['id'] not in BOOK_ITEMS:
+        item_id = self.nbt['~id']
+        page_tag = BOOK_ITEMS.get(item_id)
+        if page_tag is None:
             raise MCItemlibException('Tried to write text to non-book item.')
-        page_list = self.nbt['tag'].set_list('pages')
+        if page_number < 0 or page_number > 99:
+            raise McItemlibStyleException('Enter a page number between 0 and 99.')
+        page_list = self.nbt['~components'][page_tag].set_list('~pages')
+
+        formatted_page_text = ampersand_to_section_format(page_text)
+        if item_id == 'minecraft:written_book':
+            formatted_page_text = f"'{formatted_page_text.replace('\n', '\\\\n')}'"
+
         if page_number == -1:
-            page_list.append(ampersand_to_section_format(page_text))
+            page_list.append({'~raw': formatted_page_text})
         else:
-            page_list[page_number] = ampersand_to_section_format(page_text)
+            while (len(page_list) <= page_number):
+                if item_id == 'minecraft:written_book':
+                    page_list.append({'raw': _RawValue("""'""'""")})
+                else:
+                    page_list.append({'raw': _RawValue('""')})
+            page_list[page_number] = {'~raw': formatted_page_text}
     
 
     def set_book_author(self, author: str):
-        if self.nbt['id'] not in BOOK_ITEMS:
+        if self.nbt['~id'] != 'minecraft:written_book':
             raise MCItemlibException('Tried to write to non-book item.')
-        self.nbt['tag']['author'] = author
-    
+        self.nbt['~components']['minecraft:written_book_content']['~author'] = author
+
 
     def set_book_title(self, title: str):
-        if self.nbt['id'] not in BOOK_ITEMS:
+        if self.nbt['~id'] != 'minecraft:written_book':
             raise MCItemlibException('Tried to write to non-book item.')
-        self.nbt['tag']['title'] = title
+        self.nbt['~components']['minecraft:written_book_content']['~title'] = {'~raw': title}
 
 
-    def set_tag(self, tag_name: str, tag_value, raw: bool=False):
+    def set_custom_data(self, key: str, value, raw: bool=False):
         """
         Set a custom tag for this item in the 'tag' directory.
 
-        :param str tag_name: The name of the tag.
-        :param str tag_value: The value for the tag.
-        :param bool raw: If false, `tag_value` will be formatted normally. Otherwise, `tag_value` will appear exactly as it is inputted.
+        :param str key: The name of the tag.
+        :param str value: The value for the tag.
+        :param bool raw: If false, `value` will be formatted normally. Otherwise, `value` will appear exactly as it is inputted.
         """
         if raw:
-            tag_value = _RawTagValue(tag_value)
-        self.nbt['tag'][tag_name] = tag_value
+            value = _RawValue(value)
+        self.nbt['~components']['minecraft:custom_data'][key] = value
 
     
     def _format_as_nbt(self, value) -> str:
         if isinstance(value, int):
-            return f'{value}b'
+            return f'{value}'
         
         if isinstance(value, _TypedInt):
             return f'{value.value}{value.type}'
@@ -445,7 +468,7 @@ class Item:
         if isinstance(value, float):
             return f'{value}d'
         
-        if isinstance(value, _RawTagValue):
+        if isinstance(value, _RawValue):
             return str(value)
 
         if isinstance(value, str):
@@ -457,6 +480,7 @@ class Item:
         if isinstance(value, dict):
             nbt_list = []
             for k, v in value.items():
+                k: str = k[1:] if k.startswith('~') else f'"{k}"'
                 nbt_list.append(f'{k}:{self._format_as_nbt(v)}')
             return f'{{{",".join(nbt_list)}}}'
         
@@ -559,7 +583,7 @@ def send_codeclient(item: Item) -> int:
         return 2
 
 
-def convert_nbt_tag(nbt_tag: nbtlib.Base):
+def convert_nbt_tag(nbt_tag: nbtlib.Base, quote_keys=False):
     """
     Converts nbtlib tags into mcitemlib objects
     """
@@ -569,17 +593,21 @@ def convert_nbt_tag(nbt_tag: nbtlib.Base):
             return StyledString.from_nbt_dict(unpacked)
         new_tag = {}
         for k, v in nbt_tag.items():
-            if ':' in k:    # bad fix for Diamondfire custom item tags
-                k = _RawTagValue(f'"{k}"')
-            new_tag[k] = convert_nbt_tag(v)
+            do_quotes_here = not k.startswith('minecraft:')
+            if not quote_keys:
+                k = f'~{k}'
+            new_tag[k] = convert_nbt_tag(v, do_quotes_here)
         return AutoDict(new_tag)
     elif isinstance(nbt_tag, nbtlib.List):
-        return [convert_nbt_tag(t) for t in nbt_tag]
+        return [convert_nbt_tag(t, True) for t in nbt_tag]
     elif isinstance(nbt_tag, nbtlib.Numeric):
         return _TypedInt(nbt_tag.unpack(), nbt_tag.suffix)
     elif isinstance(nbt_tag, nbtlib.String):
         try:
             return StyledString.from_nbt(nbt_tag.unpack())
         except McItemlibStyleException:
+            unpacked = nbt_tag.unpack()
+            if '"' in unpacked:
+                return _RawValue(f"'{unpacked}'")  # this probably won't work for some things
             return nbt_tag.unpack()
     return nbt_tag.unpack()
