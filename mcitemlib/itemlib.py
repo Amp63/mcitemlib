@@ -427,9 +427,9 @@ class Item:
         else:
             while (len(page_list) <= page_number):
                 if item_id == 'minecraft:written_book':
-                    page_list.append({'raw': _RawValue("""'""'""")})
+                    page_list.append({'~raw': _RawValue("""'""'""")})
                 else:
-                    page_list.append({'raw': _RawValue('""')})
+                    page_list.append({'~raw': _RawValue('""')})
             page_list[page_number] = {'~raw': formatted_page_text}
     
 
@@ -593,13 +593,13 @@ def convert_nbt_tag(nbt_tag: nbtlib.Base, quote_keys=False):
             return StyledString.from_nbt_dict(unpacked)
         new_tag = {}
         for k, v in nbt_tag.items():
-            do_quotes_here = not k.startswith('minecraft:')
+            do_quotes_here = not (k.startswith('minecraft:') or k =='pages')
             if not quote_keys:
                 k = f'~{k}'
             new_tag[k] = convert_nbt_tag(v, do_quotes_here)
         return AutoDict(new_tag)
     elif isinstance(nbt_tag, nbtlib.List):
-        return [convert_nbt_tag(t, True) for t in nbt_tag]
+        return [convert_nbt_tag(t, quote_keys) for t in nbt_tag]
     elif isinstance(nbt_tag, nbtlib.Numeric):
         return _TypedInt(nbt_tag.unpack(), nbt_tag.suffix)
     elif isinstance(nbt_tag, nbtlib.String):
