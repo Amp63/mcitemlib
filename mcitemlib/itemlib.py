@@ -158,6 +158,11 @@ class Item:
 
     def __str__(self):
         return self.__repr__()
+
+    def __eq__(self, value):
+        if not isinstance(value, Item):
+            return False
+        return self.get_nbt() == value.get_nbt()
     
 
     def clone(self):
