@@ -191,7 +191,10 @@ class Item:
 
         :return: The count of this item.
         """
-        return self.nbt['~count']
+        count = self.nbt['~count']
+        if isinstance(count, _TypedInt):
+            return count.value
+        return count
     
 
     def get_durability(self) -> int:
@@ -200,7 +203,10 @@ class Item:
 
         :return: The damage done to this item
         """
-        return self.nbt['~components']['minecraft:damage']
+        damage = self.nbt['~components']['minecraft:damage']
+        if isinstance(damage, _TypedInt):
+            return damage.value
+        return damage
 
 
     def get_name(self) -> StyledString:
