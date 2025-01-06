@@ -408,7 +408,7 @@ class Item:
         if page_tag is None:
             raise MCItemlibException('Tried to write text to non-book item.')
         if item_id == 'minecraft:written_book':
-            formatted_pages = [{'~raw': f"'{ampersand_to_section_format(p).replace('\n', '\\\\n')}'"} for p in pages]
+            formatted_pages = [{'~raw': "'" + {ampersand_to_section_format(p).replace('\n', '\\\\n')} + "'"} for p in pages]
         else:
             formatted_pages = [{'~raw': ampersand_to_section_format(p)} for p in pages]
         self.nbt['~components'][page_tag]['~pages'] = formatted_pages
@@ -432,7 +432,7 @@ class Item:
 
         formatted_page_text = ampersand_to_section_format(page_text)
         if item_id == 'minecraft:written_book':
-            formatted_page_text = f"'{formatted_page_text.replace('\n', '\\\\n')}'"
+            formatted_page_text = "'" + formatted_page_text.replace('\n', '\\\\n') + "'"
 
         if page_number == -1:
             page_list.append({'~raw': formatted_page_text})
