@@ -1,14 +1,11 @@
 """
-Functions related to styling text.
+Functions and classes related to styled text.
 """
 
 import re
 import json
 from typing import List, Any
 
-
-class McItemlibStyleException(Exception):
-    pass
 
 STYLE_CODE_REGEX = r'(&([0-9A-Fa-fklmnorKLMNOR]|x&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]))+'
 
@@ -45,13 +42,8 @@ KEPT_FORMATTING = {
 }
 
 
-def _some_or(value: Any, none_value: Any):
-    """
-    Returns `none_value` if `value` is None, otherwise returns `value`.
-    """
-    if value is None:
-        return none_value
-    return value
+class McItemlibStyleException(Exception):
+    pass
 
 
 def _add_new_keys(d1: dict, d2: dict):
@@ -59,8 +51,7 @@ def _add_new_keys(d1: dict, d2: dict):
     Sets keys from `d2` into `d1` but only if the key doesn't already exist in `d1`.
     """
     for k, v in d2.items():
-        if k not in d1:
-            d1[k] = v
+        d1.setdefault(k, v)
 
 
 def _add_quote_escapes(string: str):
@@ -163,11 +154,12 @@ class StyledSubstring:
         style_data = nbt
         if isinstance(nbt, str):
             style_data = json.loads(nbt)
-        bold = _some_or(style_data.get('bold'), False)
-        italic = _some_or(style_data.get('italic'), False)
-        underlined = _some_or(style_data.get('underlined'), False)
-        strikethrough = _some_or(style_data.get('strikethrough'), False)
-        obfuscated = _some_or(style_data.get('obfuscated'), False)
+        
+        bold = style_data.get('bold') or False
+        italic = style_data.get('italic') or False
+        underlined = style_data.get('underlined') or False
+        strikethrough = style_data.get('strikethrough') or False
+        obfuscated = style_data.get('obfuscated') or False
 
         return StyledSubstring(style_data['text'], style_data.get('color'), bold, italic, underlined, strikethrough, obfuscated)
 
@@ -256,6 +248,46 @@ class StyledString:
         Returns an unformatted representation of this string.
         """
         return ''.join([sub.data['text'] for sub in self.substrings])
+    
+
+    def to_codes(self) -> str:
+        """
+        Converts the styled string back to a string with ampersand formatting codes.
+        """
+        if not self.substrings:
+            return ""
+        
+        # Reverse mappings
+        REVERSE_COLOR_CODES = {v: k for k, v in COLOR_CODES.items()}
+        REVERSE_FORMAT_CODES = {v: k for k, v in FORMAT_CODES.items()}
+        
+        result = []
+        
+        for substring in self.substrings:
+            codes = []
+            
+            # Add color code
+            color = substring.data.get('color')
+            if color:
+                if color.startswith('#') and len(color) == 7:
+                    # Handle hex colors
+                    hex_color = color[1:].lower()  # Remove # and make lowercase
+                    codes.append('&x')
+                    for char in hex_color:
+                        codes.append(f'&{char}')
+                elif color in REVERSE_COLOR_CODES:
+                    codes.append(f'&{REVERSE_COLOR_CODES[color]}')
+            
+            # Add format codes
+            for format_name, format_code in REVERSE_FORMAT_CODES.items():
+                if substring.data.get(format_name, False):
+                    codes.append(f'&{format_code}')
+            
+            # Combine codes and text
+            code_string = ''.join(codes)
+            result.append(code_string + substring.data['text'])
+        
+        return ''.join(result)
     
 
     def format(self):
