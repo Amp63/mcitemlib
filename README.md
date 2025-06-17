@@ -4,6 +4,10 @@ A library for creating and editing Minecraft items using python.
 
 ## Method List
 
+### Class Methods
+ - `from_tag`
+ - `from_snbt`
+
 ### General
  - `get_id`
  - `get_count`
@@ -17,25 +21,24 @@ A library for creating and editing Minecraft items using python.
 ### Lore
  - `get_lore`
  - `set_lore`
- - `set_lore_line`
 
 ### Enchantments
  - `get_enchantments`
- - `set_enchantment`
+ - `set_enchantments`
 
 ### Shulker Boxes
- - `get_shulker_box_item`
- - `set_shulker_box_item`
+ - `get_shulker_box_contents`
+ - `set_shulker_box_contents`
 
 ### Books
  - `get_book_text`
+ - `get_book_author`
+ - `get_book_title`
  - `set_book_text`
- - `set_book_page`
  - `set_book_author`
  - `set_book_title`
 
 ### Other
- - `get_tag`
- - `set_tag`
- - `get_nbt`
- - `send_to_minecraft`
+ - `get_component`
+ - `set_component`
+ - `get_snbt`
