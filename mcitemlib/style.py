@@ -96,6 +96,18 @@ def ampersand_to_section_format(string: str) -> str:
     return ''.join(split_string)
 
 
+def section_to_ampersand_format(string: str) -> str:
+    """
+    Converts a section symbol (§) prefixed format string into an ampersand prefixed one.
+    This reverses the ampersand_to_section_format function.
+    """
+    split_string = list(string)
+    for match in re.finditer(STYLE_CODE_REGEX.replace('&', '§'), string):
+        for section_match in re.finditer(r'§', match.group()):
+            split_string[match.start()+section_match.start()] = '&'
+    return ''.join(split_string)
+
+
 def snake_to_capitalized(string: str) -> str:
     """
     Converts a snake case string into a string of capitalized, space separated words.

@@ -8,7 +8,7 @@ from amulet_nbt import (
     IntTag,
     ByteTag
 )
-from mcitemlib.style import StyledString, ampersand_to_section_format
+from mcitemlib.style import StyledString, ampersand_to_section_format, section_to_ampersand_format
 
 
 BOOK_ITEMS = {
@@ -33,7 +33,9 @@ class SlotItem(TypedDict):
 
 class Item:
     def __init__(self, item_id: str, count: int=1):
-        self.nbt = amulet_nbt.from_snbt(f'{{count:{count},id:"minecraft:{item_id}"}}')
+        if not item_id.startswith('minecraft:'):
+            item_id = 'minecraft:' + item_id
+        self.nbt = amulet_nbt.from_snbt(f'{{count:{count},id:"{item_id}"}}')
 
         # Setup written book if necessary
         if item_id == 'written_book':
@@ -51,6 +53,14 @@ class Item:
 
     @classmethod
     def from_tag(cls, tag: CompoundTag):
+        """
+        Create a new item from an nbt tag.
+        """
+        # Replace legacy count with new count
+        if 'Count' in tag:
+            tag['count'] = IntTag(int(tag['Count']))
+            del tag['Count']
+        
         if 'id' not in tag or 'count' not in tag:
             raise MCItemlibException('Item requires "id" and "count" tags.')
 
@@ -94,7 +104,7 @@ class Item:
     @staticmethod
     def _check_components(func):
         """
-        Sets the `components` tag if it doesn't exist already.
+        Makes a decorated function set the `components` tag if it doesn't exist already.
         """
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -112,7 +122,7 @@ class Item:
         return Item.from_nbt(snbt)
     
 
-    def get_nbt(self) -> str:
+    def get_snbt(self) -> str:
         """
         Returns the raw snbt data of this item.
         """
@@ -186,7 +196,7 @@ class Item:
         return [StyledString.from_nbt(str(t)) for t in lore_texts]
 
 
-    def get_enchantments(self) -> dict:
+    def get_enchantments(self) -> dict[str, int]:
         """
         Get a list of enchantments applied to this item.
 
@@ -254,7 +264,44 @@ class Item:
             return []
         
         pages = components[page_tag_key]['pages']
-        return [StyledString.from_codes(str(p['raw'])) for p in pages]
+        styled_pages = []
+        for page in pages:
+            raw_page = str(page['raw'])
+
+            # Undo written_book modifications
+            if self.get_id() == 'minecraft:written_book':
+                raw_page = raw_page[1:-1].replace('\\n', '\n')
+            
+            raw_page = section_to_ampersand_format(raw_page)
+            styled_pages.append(StyledString.from_codes(raw_page))
+        
+        return styled_pages
+
+
+    def get_book_author(self) -> str:
+        if self.get_id() != 'minecraft:written_book':
+            raise MCItemlibException('Tried to get author on non-written-book item.')
+
+        if 'components' not in self.nbt or \
+          'minecraft:written_book_content' not in self.nbt['components'] or \
+          'author' not in self.nbt['components']['minecraft:written_book_content']:
+            raise MCItemlibException('Book does not have an author.')
+        
+        author_tag: StringTag = self.nbt['components']['minecraft:written_book_content']['author']
+        return str(author_tag)        
+
+
+    def get_book_title(self) -> StyledString:
+        if self.get_id() != 'minecraft:written_book':
+            raise MCItemlibException('Tried to get title on non-written-book item.')
+        
+        if 'components' not in self.nbt or \
+          'minecraft:written_book_content' not in self.nbt['components'] or \
+          'title' not in self.nbt['components']['minecraft:written_book_content']:
+            raise MCItemlibException('Book does not have a title.')
+
+        title_tag = self.nbt['components']['minecraft:written_book_content']['title']
+        return StyledString.from_codes(section_to_ampersand_format(str(title_tag['raw'])))
 
 
     def get_component(self, key: str) -> amulet_nbt.AnyNBT:
@@ -280,7 +327,7 @@ class Item:
         :param str id: The ID to set.
         """
         if not id.startswith('minecraft:'):
-            raise MCItemlibException('ID should start with "minecraft:".')
+            id = 'minecraft:' + id
         
         self.nbt['id'] = StringTag(id)
     
@@ -353,6 +400,8 @@ class Item:
         enchantments_tag = components['minecraft:enchantments']['levels']
 
         for enchant_id, enchant_level in enchantments.items():
+            if not enchant_id.startswith('minecraft:'):
+                enchant_id = 'minecraft:' + enchant_id
             enchantments_tag[enchant_id] = IntTag(enchant_level)
     
 
@@ -400,6 +449,11 @@ class Item:
                 page_string = StyledString.from_codes(page_string)
             
             raw_value = ampersand_to_section_format(page_string.to_codes())
+
+            # Apply strange written_book modifications
+            if self.get_id() == 'minecraft:written_book':
+                raw_value = f'"{raw_value}"'.replace('\n', '\\n')
+            
             page_tag = CompoundTag({'raw': StringTag(raw_value)})
             pages_tag.append(page_tag)
         
