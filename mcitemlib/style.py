@@ -245,6 +245,7 @@ class StyledString:
     @staticmethod
     def from_nbt(nbt: str):
         try:
+            nbt = nbt.replace('\\', '\\\\').replace("\\\\'", "'")
             nbt_dict = json.loads(nbt)
             if not isinstance(nbt_dict, dict):
                 raise McItemlibStyleException('Invalid JSON string.')

@@ -8,7 +8,7 @@ from amulet_nbt import (
     IntTag,
     ByteTag
 )
-from mcitemlib.style import StyledString, ampersand_to_section_format, section_to_ampersand_format
+from mcitemlib.style import StyledString, ampersand_to_section_format, section_to_ampersand_format, McItemlibStyleException
 
 
 BOOK_ITEMS = {
@@ -193,7 +193,16 @@ class Item:
             raise MCItemlibException('Item does not have lore.')
         
         lore_texts: ListTag = components['minecraft:lore']
-        return [StyledString.from_nbt(str(t)) for t in lore_texts]
+        styled_lore_texts = []
+        for t in lore_texts:
+            try:
+                styled_lore_texts.append(StyledString.from_nbt(str(t)))
+            except McItemlibStyleException:
+                t = str(t)
+                if t == '""':
+                    t = ''
+                styled_lore_texts.append(StyledString.from_string(t))
+        return styled_lore_texts
 
 
     def get_enchantments(self) -> dict[str, int]:
