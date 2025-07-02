@@ -3,8 +3,7 @@ Functions and classes related to styled text.
 """
 
 import re
-import json
-from typing import List, Any
+from amulet_nbt import from_snbt, CompoundTag, StringTag, AnyNBT
 
 
 STYLE_CODE_REGEX = r'(&([0-9A-Fa-fklmnorKLMNOR]|x&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]))+'
@@ -46,12 +45,13 @@ class McItemlibStyleException(Exception):
     pass
 
 
-def _add_new_keys(d1: dict, d2: dict):
+def _add_new_keys(d1: CompoundTag, d2: dict[str, AnyNBT]):
     """
     Sets keys from `d2` into `d1` but only if the key doesn't already exist in `d1`.
     """
     for k, v in d2.items():
-        d1.setdefault(k, v)
+        if k not in d1:
+            d1[k] = v
 
 
 def _add_quote_escapes(string: str):
@@ -68,8 +68,8 @@ def _add_quote_escapes(string: str):
 
 def _simple_to_string(value) -> str:
     """
-    My implementation for converting values to correctly formatted strings.
-    Doesn't do weird stuff to escape characters like json.dumps does.
+    Convert values to correctly formatted strings.
+    Doesn't do weird stuff to escape characters.
     """
     if isinstance(value, bool):
         return 'true' if value else 'false'
@@ -162,10 +162,10 @@ class StyledSubstring:
     
 
     @staticmethod
-    def from_nbt(nbt: str|dict):
+    def from_nbt(nbt: str | CompoundTag):
         style_data = nbt
         if isinstance(nbt, str):
-            style_data = json.loads(nbt)
+            style_data = from_snbt(nbt)
         
         bold = style_data.get('bold') or False
         italic = style_data.get('italic') or False
@@ -173,7 +173,11 @@ class StyledSubstring:
         strikethrough = style_data.get('strikethrough') or False
         obfuscated = style_data.get('obfuscated') or False
 
-        return StyledSubstring(style_data['text'], style_data.get('color'), bold, italic, underlined, strikethrough, obfuscated)
+        color = style_data.get('color')
+        if color is not None:
+            color = str(color)
+        
+        return StyledSubstring(str(style_data['text']), color, bold, italic, underlined, strikethrough, obfuscated)
 
     
     def format(self) -> str:
@@ -186,7 +190,7 @@ class StyledSubstring:
 
 
 class StyledString:
-    def __init__(self, substrings: List[StyledSubstring]):
+    def __init__(self, substrings: list[StyledSubstring]):
         self.substrings = substrings
     
 
@@ -225,35 +229,39 @@ class StyledString:
     
 
     @staticmethod
-    def from_nbt_dict(nbt_dict: dict):
-        if 'extra' in nbt_dict:
+    def from_nbt_tag(nbt_tag: CompoundTag):
+        if 'extra' in nbt_tag:
             substrings = []
-            extra = nbt_dict['extra']
-            outside_extra = {k: v for k, v in nbt_dict.items() if k != 'extra'}
-            if nbt_dict['text'] != '':
+            extra = nbt_tag['extra']
+            outside_extra = {k: v for k, v in nbt_tag.items() if k != 'extra'}
+            if str(nbt_tag['text']) != '':
                 substrings = [StyledSubstring.from_nbt(outside_extra)]
-            for substring_dict in extra:
-                if isinstance(substring_dict, str):
-                    substring_dict = {'text': substring_dict}
-                _add_new_keys(substring_dict, outside_extra)
-                substrings.extend(StyledString.from_nbt_dict(substring_dict).substrings)
+            for substring_tag in extra:
+                if isinstance(substring_tag, StringTag):
+                    substring_tag = CompoundTag({'text': substring_tag})
+                _add_new_keys(substring_tag, outside_extra)
+                substrings.extend(StyledString.from_nbt_tag(substring_tag).substrings)
             return StyledString(substrings)
 
-        return StyledString([StyledSubstring.from_nbt(nbt_dict)])
+        return StyledString([StyledSubstring.from_nbt(nbt_tag)])
     
 
     @staticmethod
     def from_nbt(nbt: str):
+        if nbt.strip() in {'', '""', "''"}:
+            return StyledString.from_string('')
+
+        nbt = nbt.replace("\\'", "'")  # Replace \' with single quote
+
         try:
-            nbt = nbt.replace('\\', '\\\\').replace("\\\\'", "'")
-            nbt_dict = json.loads(nbt)
-            if not isinstance(nbt_dict, dict):
-                raise McItemlibStyleException('Invalid JSON string.')
-            if 'text' in nbt_dict:
-                return StyledString.from_nbt_dict(nbt_dict)
+            nbt_tag = from_snbt(nbt)
+            if not isinstance(nbt_tag, CompoundTag):
+                raise McItemlibStyleException('Invalid style snbt.')
+            if 'text' in nbt_tag:
+                return StyledString.from_nbt_tag(nbt_tag)
             raise McItemlibStyleException('String is not a formatted styled string.')
-        except json.JSONDecodeError:
-            raise McItemlibStyleException('Invalid JSON string.')
+        except Exception as e:
+            raise McItemlibStyleException(str(e))
         
 
     def to_string(self) -> str:

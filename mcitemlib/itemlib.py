@@ -198,9 +198,6 @@ class Item:
             try:
                 styled_lore_texts.append(StyledString.from_nbt(str(t)))
             except McItemlibStyleException:
-                t = str(t)
-                if t == '""':
-                    t = ''
                 styled_lore_texts.append(StyledString.from_string(t))
         return styled_lore_texts
 
