@@ -9,6 +9,7 @@ from amulet_nbt import (
     ByteTag
 )
 from mcitemlib.style import StyledString, ampersand_to_section_format, section_to_ampersand_format, McItemlibStyleException
+from mcitemlib.legacy import convert_legacy_item
 
 
 BOOK_ITEMS = {
@@ -56,10 +57,9 @@ class Item:
         """
         Create a new item from an nbt tag.
         """
-        # Replace legacy count with new count
+        # Convert legacy item if necessary
         if 'Count' in tag:
-            tag['count'] = IntTag(int(tag['Count']))
-            del tag['Count']
+            tag = convert_legacy_item(tag)
         
         if 'id' not in tag or 'count' not in tag:
             raise MCItemlibException('Item requires "id" and "count" tags.')
@@ -84,6 +84,22 @@ class Item:
         except amulet_nbt.SNBTParseError as e:
             raise MCItemlibException(f'Failed to parse nbt: {str(e)}')
 
+        return cls.from_tag(nbt)
+    
+
+    @classmethod
+    def from_nbt(cls, path_or_buffer: str | bytes):
+        """
+        Create a new item from an nbt file.
+        """
+        try:
+            named_tag = amulet_nbt.load(path_or_buffer)
+            nbt = named_tag.compound
+        except amulet_nbt.SNBTParseError as e:
+            raise MCItemlibException(f'Failed to parse nbt: {str(e)}')
+        except TypeError:
+            raise MCItemlibException('Expected a Compound Tag as the root nbt tag.')
+        
         return cls.from_tag(nbt)
 
 
