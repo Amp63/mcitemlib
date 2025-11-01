@@ -39,7 +39,7 @@ class Item:
         self.nbt = amulet_nbt.from_snbt(f'{{count:{count},id:"{item_id}"}}')
 
         # Setup written book if necessary
-        if item_id == 'written_book':
+        if item_id == 'minecraft:written_book':
             if 'components' not in self.nbt:
                 self.nbt['components'] = CompoundTag()
             
@@ -190,8 +190,8 @@ class Item:
             id_name = self.get_id().replace('minecraft:', '').replace('_', ' ').capitalize()
             return StyledString.from_string(id_name)
         
-        name_tag: StringTag = self.nbt['components']['minecraft:custom_name']
-        return StyledString.from_nbt(str(name_tag))
+        name_tag: CompoundTag = self.nbt['components']['minecraft:custom_name']
+        return StyledString.from_nbt_tag(name_tag)
 
 
     
@@ -208,13 +208,13 @@ class Item:
         if 'minecraft:lore' not in components:
             raise MCItemlibException('Item does not have lore.')
         
-        lore_texts: ListTag = components['minecraft:lore']
+        lore_texts: ListTag[CompoundTag] = components['minecraft:lore']
         styled_lore_texts = []
         for t in lore_texts:
             try:
-                styled_lore_texts.append(StyledString.from_nbt(str(t)))
+                styled_lore_texts.append(StyledString.from_nbt_tag(t))
             except McItemlibStyleException:
-                styled_lore_texts.append(StyledString.from_string(t))
+                styled_lore_texts.append(StyledString.from_string(str(t)))
         return styled_lore_texts
 
 
@@ -233,7 +233,7 @@ class Item:
             raise MCItemlibException('Item does not have any enchantments.')
 
         
-        enchantments_tag: CompoundTag = components['minecraft:enchantments']['levels']
+        enchantments_tag: CompoundTag = components['minecraft:enchantments']
         enchantments = {}
         for enchant_id, enchant_level in enchantments_tag.items():
             enchantments[enchant_id] = int(enchant_level)
@@ -386,7 +386,7 @@ class Item:
         if isinstance(name, str):
             name = StyledString.from_codes(name)
 
-        self.nbt['components']['minecraft:custom_name'] = StringTag(name.format())
+        self.nbt['components']['minecraft:custom_name'] = name.format()
     
 
     @_check_components
@@ -401,7 +401,7 @@ class Item:
         for line in lore_lines:
             if isinstance(line, str):
                 line = StyledString.from_codes(line)
-            line_tag = StringTag(line.format())
+            line_tag = line.format()
             formatted_lore_lines.append(line_tag)
         
         self.nbt['components']['minecraft:lore'] = ListTag(formatted_lore_lines)
@@ -417,9 +417,9 @@ class Item:
         
         components: CompoundTag = self.nbt['components']
         if not 'minecraft:enchantments' in components:
-            components['minecraft:enchantments'] = CompoundTag({'levels': CompoundTag()})
+            components['minecraft:enchantments'] = CompoundTag()
         
-        enchantments_tag = components['minecraft:enchantments']['levels']
+        enchantments_tag = components['minecraft:enchantments']
 
         for enchant_id, enchant_level in enchantments.items():
             if not enchant_id.startswith('minecraft:'):
@@ -471,10 +471,6 @@ class Item:
                 page_string = StyledString.from_codes(page_string)
             
             raw_value = ampersand_to_section_format(page_string.to_codes())
-
-            # Apply strange written_book modifications
-            if self.get_id() == 'minecraft:written_book':
-                raw_value = f'"{raw_value}"'.replace('\n', '\\n')
             
             page_tag = CompoundTag({'raw': StringTag(raw_value)})
             pages_tag.append(page_tag)

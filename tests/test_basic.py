@@ -14,7 +14,7 @@ def test_from_snbt():
 
 
 def test_getters():
-    ITEM_NBT = """{components:{"minecraft:custom_name":'{"extra":[{"color":"red","text":"Test "},{"bold":true,"color":"gold","text":"Item"}],"italic":false,"text":""}',"minecraft:damage":50,"minecraft:enchantments":{levels:{"minecraft:efficiency":5,"minecraft:unbreaking":1}},"minecraft:lore":['{"bold":false,"color":"green","italic":false,"obfuscated":false,"strikethrough":false,"text":"Line 1","underlined":false}','{"bold":false,"color":"aqua","italic":false,"obfuscated":false,"strikethrough":false,"text":"Line 2","underlined":false}','{"bold":false,"color":"red","italic":false,"obfuscated":false,"strikethrough":false,"text":"Line 3","underlined":false}']},count:1,id:"minecraft:diamond_pickaxe"}"""
+    ITEM_NBT = """{DF_NBT:4440,components:{"minecraft:custom_name":{extra:[{color:"red",text:"Test "},{color:"gold",text:"Item"}],italic:0b,text:""},"minecraft:damage":50,"minecraft:enchantments":{"minecraft:efficiency":5,"minecraft:unbreaking":1},"minecraft:lore":[{bold:0b,color:"dark_green",italic:0b,obfuscated:0b,strikethrough:0b,text:"Line 1",underlined:0b},{bold:0b,color:"aqua",italic:0b,obfuscated:0b,strikethrough:0b,text:"Line 2",underlined:0b},{bold:0b,color:"white",extra:[{color:"red",text:"Line 3"}],italic:0b,obfuscated:0b,strikethrough:0b,text:"",underlined:0b}]},count:1,id:"minecraft:diamond_pickaxe"}"""
     item = Item.from_snbt(ITEM_NBT)
     assert item.get_id() == 'minecraft:diamond_pickaxe', 'Failed to get item id.'
     assert item.get_count() == 1, 'Failed to get item count.'

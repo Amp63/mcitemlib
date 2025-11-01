@@ -3,7 +3,7 @@ Functions and classes related to styled text.
 """
 
 import re
-from amulet_nbt import from_snbt, CompoundTag, StringTag, AnyNBT
+from amulet_nbt import from_snbt, CompoundTag, ListTag, StringTag, ByteTag, AnyNBT
 
 
 STYLE_CODE_REGEX = r'(&([0-9A-Fa-fklmnorKLMNOR]|x&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]))+'
@@ -180,13 +180,20 @@ class StyledSubstring:
         return StyledSubstring(str(style_data['text']), color, bold, italic, underlined, strikethrough, obfuscated)
 
     
-    def format(self) -> str:
-        format_data = {}
+    def format(self) -> CompoundTag:
+        format_data = {
+            'text': _add_quote_escapes(self.data['text'])
+        }
+
         for key, value in self.data.items():
             if value or key in KEPT_FORMATTING:
                 format_data[key] = value
-        format_data['text'] = _add_quote_escapes(format_data['text'])
-        return _simple_to_string(format_data)
+            if isinstance(value, str):
+                format_data[key] = StringTag(value)
+            elif isinstance(value, bool):
+                format_data[key] = ByteTag(int(value))
+        
+        return CompoundTag(format_data)
 
 
 class StyledString:
@@ -311,7 +318,7 @@ class StyledString:
         return ''.join(result)
     
 
-    def format(self):
+    def format(self) -> CompoundTag:
         amount_substrings = len(self.substrings)
         if amount_substrings == 0:
             raise McItemlibStyleException('Cannot format styled string without any substrings.')
@@ -319,5 +326,8 @@ class StyledString:
             return self.substrings[0].format()
 
         formatted_substrings = [s.format() for s in self.substrings]
-        extra = ','.join(formatted_substrings)
-        return f'{{"extra":[{extra}],"text":""}}'
+        extra = ListTag(formatted_substrings)
+        return CompoundTag({
+            'extra': extra,
+            'text': StringTag('')
+        })

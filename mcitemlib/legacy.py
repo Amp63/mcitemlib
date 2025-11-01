@@ -133,12 +133,12 @@ def _convert_enchantments(components_tag: CompoundTag, data_tag: CompoundTag):
     old_enchants: ListTag = data_tag.get('Enchantments')
     if old_enchants is not None:
         enchant_levels = convert_levels(old_enchants)
-        components_tag['minecraft:enchantments'] = CompoundTag({'levels': enchant_levels})
+        components_tag['minecraft:enchantments'] = enchant_levels
     
     old_stored_enchants: ListTag = data_tag.get('StoredEnchantments')
     if old_stored_enchants is not None:
         stored_enchant_levels = convert_levels(old_enchants)
-        components_tag['minecraft:stored_enchantments'] = CompoundTag({'levels': stored_enchant_levels})
+        components_tag['minecraft:stored_enchantments'] = stored_enchant_levels
 
 
 def _convert_writable_book(components_tag: CompoundTag, data_tag: CompoundTag):
