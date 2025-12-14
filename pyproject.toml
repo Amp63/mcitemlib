@@ -17,7 +17,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.0.2"
+    "pytest>=9.0.2",
+    "twine>=6.2.0"
 ]
 
 
@@ -26,5 +27,5 @@ Repository = "https://github.com/Amp63/mcitemlib"
 
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
