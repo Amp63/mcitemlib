@@ -16,10 +16,7 @@ BOOK_ITEMS = {
     'minecraft:written_book': 'minecraft:written_book_content'
 }
 
-COL_WARN = '\x1b[33m'
-COL_RESET = '\x1b[0m'
-COL_SUCCESS = '\x1b[32m'
-COL_ERROR = '\x1b[31m'
+DEFAULT_SNBT_FORMAT = SnbtFormat.Minimize | SnbtFormat.ForceValueQuote
 
 
 class MCItemlibException(Exception):
@@ -134,11 +131,10 @@ class Item:
         """
         Returns a deep copy of this item.
         """
-        snbt = self.nbt.to_snbt()
-        return Item.from_nbt(snbt)
+        return Item.from_tag(self.nbt.copy())
     
 
-    def get_snbt(self, format=SnbtFormat.Minimize, indent: int=0) -> str:
+    def get_snbt(self, format=DEFAULT_SNBT_FORMAT, indent: int=0) -> str:
         """
         Returns the raw snbt data of this item.
         """
