@@ -17,7 +17,7 @@ Supported components:
 """
 
 
-from amulet_nbt import (
+from rapidnbt import (
     CompoundTag, ListTag,
     ByteTag, IntTag, StringTag
 )
@@ -95,8 +95,8 @@ BANNER_COLORS = [
 
 
 def _convert_attribute_modifiers(components_tag: CompoundTag, data_tag: CompoundTag):
-    old_modifiers = data_tag.get('AttributeModifiers')
-    if old_modifiers is None:
+    old_modifiers = data_tag['AttributeModifiers']
+    if old_modifiers.is_null():
         return
     
     new_modifiers = ListTag()
@@ -117,8 +117,8 @@ def _convert_damage_and_unbreakable(components_tag: CompoundTag, data_tag: Compo
     if 'Damage' in data_tag:
         components_tag['minecraft:damage'] = data_tag['Damage']
     
-    unbreakable = data_tag.get('Unbreakable')
-    if unbreakable is not None and int(unbreakable):
+    unbreakable = data_tag['Unbreakable']
+    if not unbreakable.is_null() and unbreakable.get_int():
         components_tag['minecraft:unbreakable'] = CompoundTag()
 
 
@@ -130,13 +130,13 @@ def _convert_enchantments(components_tag: CompoundTag, data_tag: CompoundTag):
             levels[old_enchant_id] = IntTag(int(old_enchant_id['lvl']))
         return levels
 
-    old_enchants: ListTag = data_tag.get('Enchantments')
-    if old_enchants is not None:
+    old_enchants: ListTag = data_tag['Enchantments']
+    if not old_enchants.is_null():
         enchant_levels = convert_levels(old_enchants)
         components_tag['minecraft:enchantments'] = enchant_levels
     
-    old_stored_enchants: ListTag = data_tag.get('StoredEnchantments')
-    if old_stored_enchants is not None:
+    old_stored_enchants: ListTag = data_tag['StoredEnchantments']
+    if not old_stored_enchants.is_null():
         stored_enchant_levels = convert_levels(old_enchants)
         components_tag['minecraft:stored_enchantments'] = stored_enchant_levels
 
@@ -145,8 +145,8 @@ def _convert_writable_book(components_tag: CompoundTag, data_tag: CompoundTag):
     if 'author' in data_tag:  # Is a written book, so skip
         return
     
-    old_pages = data_tag.get('Pages')
-    if old_pages is None:
+    old_pages = data_tag['Pages']
+    if old_pages.is_null():
         return
     
     new_pages = ListTag()
@@ -160,8 +160,8 @@ def _convert_writable_book(components_tag: CompoundTag, data_tag: CompoundTag):
 
 
 def _convert_written_book(components_tag: CompoundTag, data_tag: CompoundTag):
-    old_pages = data_tag.get('Pages')
-    if old_pages is None:
+    old_pages = data_tag['Pages']
+    if old_pages.is_null():
         return
     
     written_book_content = CompoundTag({
@@ -183,8 +183,8 @@ def _convert_written_book(components_tag: CompoundTag, data_tag: CompoundTag):
 
 
 def _convert_banner_patterns(components_tag: CompoundTag, block_entity_tag: CompoundTag):
-    old_patterns = block_entity_tag.get('Patterns')
-    if old_patterns is None:
+    old_patterns = block_entity_tag['Patterns']
+    if old_patterns.is_null():
         return
     
     new_patterns = ListTag()
@@ -199,8 +199,8 @@ def _convert_banner_patterns(components_tag: CompoundTag, block_entity_tag: Comp
 
 
 def _convert_container(components_tag: CompoundTag, block_entity_tag: CompoundTag):
-    items_tag = block_entity_tag.get('Items')
-    if items_tag is None:
+    items_tag = block_entity_tag['Items']
+    if items_tag.is_null():
         return
     
     container_tag = ListTag()
@@ -238,16 +238,16 @@ def convert_legacy_item(legacy_item: CompoundTag) -> CompoundTag:
     """
     modern_item = CompoundTag()
 
-    modern_item['count'] = IntTag(legacy_item['Count'])
-    modern_item['id'] = StringTag(legacy_item['id'])
+    modern_item['count'] = IntTag(legacy_item['Count'].get_byte())
+    modern_item['id'] = StringTag(legacy_item['id'].get_string())
 
-    slot_value: ByteTag | None = legacy_item.get('slot')
+    slot_value: ByteTag | None = legacy_item['slot']
     if slot_value:
         modern_item['slot'] = slot_value
 
     # Convert data tag keys
-    data_tag = legacy_item.get('tag')
-    if data_tag is not None:
+    data_tag = legacy_item['tag']
+    if not data_tag.is_null():
         components_tag = CompoundTag()
         _convert_attribute_modifiers(components_tag, data_tag)
         _convert_damage_and_unbreakable(components_tag, data_tag)
@@ -256,14 +256,14 @@ def convert_legacy_item(legacy_item: CompoundTag) -> CompoundTag:
         _convert_written_book(components_tag, data_tag)
 
         # Convert block entity keys
-        block_entity_tag = data_tag.get('BlockEntityTag')
-        if block_entity_tag is not None:
+        block_entity_tag = data_tag['BlockEntityTag']
+        if not block_entity_tag.is_null():
             _convert_banner_patterns(components_tag, block_entity_tag)
             _convert_container(components_tag, block_entity_tag)
         
         # Convert display keys
-        display_tag = data_tag.get('display')
-        if display_tag is not None:
+        display_tag = data_tag['display']
+        if not display_tag.is_null():
             _convert_name(components_tag, display_tag)
             _convert_lore(components_tag, display_tag)
         

@@ -3,7 +3,11 @@ Functions and classes related to styled text.
 """
 
 import re
-from amulet_nbt import from_snbt, CompoundTag, ListTag, StringTag, ByteTag, AnyNBT
+from rapidnbt import (
+    nbtio, TagType,
+    CompoundTag, ListTag, CompoundTagVariant,
+    StringTag, ByteTag
+)
 
 
 STYLE_CODE_REGEX = r'(&([0-9A-Fa-fklmnorKLMNOR]|x&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]&[0-9A-Fa-f]))+'
@@ -45,7 +49,7 @@ class McItemlibStyleException(Exception):
     pass
 
 
-def _add_new_keys(d1: CompoundTag, d2: dict[str, AnyNBT]):
+def _add_new_keys(d1: CompoundTag, d2: dict[str, CompoundTagVariant]):
     """
     Sets keys from `d2` into `d1` but only if the key doesn't already exist in `d1`.
     """
@@ -162,22 +166,35 @@ class StyledSubstring:
     
 
     @staticmethod
-    def from_nbt(nbt: str | CompoundTag):
-        style_data = nbt
-        if isinstance(nbt, str):
-            style_data = from_snbt(nbt)
+    def from_snbt(snbt: str | CompoundTag):
+        style_data = snbt
+        if isinstance(snbt, str):
+            style_data = nbtio.loads_snbt(snbt)
+            if style_data is None:
+                raise McItemlibStyleException('Failed to parse styled string snbt.')
         
-        bold = style_data.get('bold') or False
-        italic = style_data.get('italic') or False
-        underlined = style_data.get('underlined') or False
-        strikethrough = style_data.get('strikethrough') or False
-        obfuscated = style_data.get('obfuscated') or False
+        def bool_tag(tag: CompoundTagVariant):
+            if tag.is_null():
+                return False
+            if tag.get_type() == TagType.Byte:
+                return bool(tag.get_byte())
+            if tag.is_number_integer():
+                return bool(tag.get_int())
+            raise McItemlibStyleException('Failed to parse style formatting option.')
+        
+        bold = bool_tag(style_data['bold'])
+        italic = bool_tag(style_data['italic'])
+        underlined = bool_tag(style_data['underlined'])
+        strikethrough = bool_tag(style_data['strikethrough'])
+        obfuscated = bool_tag(style_data['obfuscated'])
 
-        color = style_data.get('color')
-        if color is not None:
-            color = str(color)
+        color = style_data['color']
+        if not color.is_null():
+            color = color.get_string()
+        else:
+            color = None
         
-        return StyledSubstring(str(style_data['text']), color, bold, italic, underlined, strikethrough, obfuscated)
+        return StyledSubstring(style_data['text'].get_string(), color, bold, italic, underlined, strikethrough, obfuscated)
 
     
     def format(self) -> CompoundTag:
@@ -240,35 +257,34 @@ class StyledString:
         if 'extra' in nbt_tag:
             substrings = []
             extra = nbt_tag['extra']
-            outside_extra = {k: v for k, v in nbt_tag.items() if k != 'extra'}
+            outside_extra = CompoundTag({k: v for k, v in nbt_tag.items() if k != 'extra'})
             if str(nbt_tag['text']) != '':
-                substrings = [StyledSubstring.from_nbt(outside_extra)]
+                substrings = [StyledSubstring.from_snbt(outside_extra)]
             for substring_tag in extra:
-                if isinstance(substring_tag, StringTag):
+                if not isinstance(substring_tag, CompoundTag):
                     substring_tag = CompoundTag({'text': substring_tag})
                 _add_new_keys(substring_tag, outside_extra)
                 substrings.extend(StyledString.from_nbt_tag(substring_tag).substrings)
             return StyledString(substrings)
 
-        return StyledString([StyledSubstring.from_nbt(nbt_tag)])
+        return StyledString([StyledSubstring.from_snbt(nbt_tag)])
     
 
     @staticmethod
-    def from_nbt(nbt: str):
-        if nbt.strip() in {'', '""', "''"}:
+    def from_snbt(snbt: str):
+        if snbt.strip() in {'', '""', "''"}:
             return StyledString.from_string('')
 
-        nbt = nbt.replace("\\'", "'")  # Replace \' with single quote
+        snbt = snbt.replace("\\'", "'")  # Replace \' with single quote
 
-        try:
-            nbt_tag = from_snbt(nbt)
-            if not isinstance(nbt_tag, CompoundTag):
-                raise McItemlibStyleException('Invalid style snbt.')
-            if 'text' in nbt_tag:
-                return StyledString.from_nbt_tag(nbt_tag)
-            raise McItemlibStyleException('String is not a formatted styled string.')
-        except Exception as e:
-            raise McItemlibStyleException(str(e))
+        nbt_tag = nbtio.loads_snbt(snbt)
+        if nbt_tag is None:
+            raise McItemlibStyleException('Failed to parse styled string snbt.')
+        if not isinstance(nbt_tag, CompoundTag):
+            raise McItemlibStyleException('Invalid style snbt.')
+        if 'text' in nbt_tag:
+            return StyledString.from_nbt_tag(nbt_tag)
+        raise McItemlibStyleException('String is not a formatted styled string.')
         
 
     def to_string(self) -> str:

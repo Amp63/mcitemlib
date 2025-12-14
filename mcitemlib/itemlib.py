@@ -1,12 +1,11 @@
 from typing import Any, TypedDict
+from os import PathLike
 import functools
-import amulet_nbt
-from amulet_nbt import (
-    CompoundTag,
-    ListTag,
-    StringTag,
-    IntTag,
-    ByteTag
+from rapidnbt import (
+    nbtio, SnbtFormat, TagType,
+    CompoundTag, ListTag, StringTag,
+    IntTag, ByteTag,
+    CompoundTagVariant,
 )
 from mcitemlib.style import StyledString, ampersand_to_section_format, section_to_ampersand_format, McItemlibStyleException
 from mcitemlib.legacy import convert_legacy_item
@@ -36,7 +35,11 @@ class Item:
     def __init__(self, item_id: str, count: int=1):
         if not item_id.startswith('minecraft:'):
             item_id = 'minecraft:' + item_id
-        self.nbt = amulet_nbt.from_snbt(f'{{count:{count},id:"{item_id}"}}')
+        
+        self.nbt = CompoundTag({
+            'count': IntTag(count),
+            'id': StringTag(item_id)
+        })
 
         # Setup written book if necessary
         if item_id == 'minecraft:written_book':
@@ -64,10 +67,11 @@ class Item:
         if 'id' not in tag or 'count' not in tag:
             raise MCItemlibException('Item requires "id" and "count" tags.')
 
-        if not isinstance(tag['id'], StringTag):
+        if not tag['id'].is_string():
             raise MCItemlibException('Expected `StringTag` for key "id".')
-        if not isinstance(tag['count'], IntTag):
-            raise MCItemlibException('Expected `IntTag` for key "count".')
+        count_type = tag['count'].get_type()
+        if count_type != TagType.Int:
+            raise MCItemlibException(f'Expected `IntTag` for key "count", but got `{count_type}`')
 
         item = cls('stone', 1)
         item.nbt = tag
@@ -79,26 +83,22 @@ class Item:
         """
         Create a new item from an snbt string.
         """
-        try:
-            nbt = amulet_nbt.from_snbt(snbt)
-        except amulet_nbt.SNBTParseError as e:
-            raise MCItemlibException(f'Failed to parse nbt: {str(e)}')
+        nbt = nbtio.loads_snbt(snbt)
+        if nbt is None:
+            raise MCItemlibException('Failed to parse snbt.')
 
         return cls.from_tag(nbt)
     
 
     @classmethod
-    def from_nbt(cls, path_or_buffer: str | bytes):
+    def from_nbt(cls, path: PathLike):
         """
         Create a new item from an nbt file.
         """
-        try:
-            named_tag = amulet_nbt.load(path_or_buffer)
-            nbt = named_tag.compound
-        except amulet_nbt.SNBTParseError as e:
-            raise MCItemlibException(f'Failed to parse nbt: {str(e)}')
-        except TypeError:
-            raise MCItemlibException('Expected a Compound Tag as the root nbt tag.')
+
+        nbt = nbtio.load(path)
+        if nbt is None:
+            raise MCItemlibException('Failed to parse nbt.')
         
         return cls.from_tag(nbt)
 
@@ -138,11 +138,11 @@ class Item:
         return Item.from_nbt(snbt)
     
 
-    def get_snbt(self) -> str:
+    def get_snbt(self, format=SnbtFormat.Minimize, indent: int=0) -> str:
         """
         Returns the raw snbt data of this item.
         """
-        return self.nbt.to_snbt()
+        return self.nbt.to_snbt(format, indent)
 
 
     def get_id(self) -> str:
@@ -151,7 +151,7 @@ class Item:
 
         :return: The ID of this item.
         """
-        return str(self.nbt['id'])
+        return self.nbt['id'].get_string()
     
 
     def get_count(self) -> int:
@@ -160,7 +160,7 @@ class Item:
 
         :return: The count of this item.
         """
-        return int(self.nbt['count'])
+        return self.nbt['count'].get_int()
     
 
     def get_durability(self) -> int:
@@ -176,7 +176,7 @@ class Item:
         if 'minecraft:damage' not in components:
             return 0
         
-        return int(self.nbt['components']['minecraft:damage'])
+        return self.nbt['components']['minecraft:damage'].get_int()
 
 
     def get_name(self) -> StyledString:
@@ -236,7 +236,7 @@ class Item:
         enchantments_tag: CompoundTag = components['minecraft:enchantments']
         enchantments = {}
         for enchant_id, enchant_level in enchantments_tag.items():
-            enchantments[enchant_id] = int(enchant_level)
+            enchantments[enchant_id] = enchant_level.get_int()
         
         return enchantments
 
@@ -261,7 +261,7 @@ class Item:
         contents: list[SlotItem] = []
         for slot_data in container:
             contents.append({
-                'slot': int(slot_data['slot']),
+                'slot': slot_data['slot'].get_int(),
                 'item': self.from_tag(slot_data['item'])
             })
         
@@ -288,8 +288,9 @@ class Item:
         pages = components[page_tag_key]['pages']
         styled_pages = []
         for page in pages:
-            raw_page = str(page['raw'])
+            raw_page = page['raw'].get_string()
 
+            # TODO: Possibly remove this since I think they are now the same
             # Undo written_book modifications
             if self.get_id() == 'minecraft:written_book':
                 raw_page = raw_page[1:-1].replace('\\n', '\n')
@@ -309,8 +310,8 @@ class Item:
           'author' not in self.nbt['components']['minecraft:written_book_content']:
             raise MCItemlibException('Book does not have an author.')
         
-        author_tag: StringTag = self.nbt['components']['minecraft:written_book_content']['author']
-        return str(author_tag)        
+        author_tag = self.nbt['components']['minecraft:written_book_content']['author']
+        return author_tag.get_string()
 
 
     def get_book_title(self) -> StyledString:
@@ -323,10 +324,10 @@ class Item:
             raise MCItemlibException('Book does not have a title.')
 
         title_tag = self.nbt['components']['minecraft:written_book_content']['title']
-        return StyledString.from_codes(section_to_ampersand_format(str(title_tag['raw'])))
+        return StyledString.from_codes(section_to_ampersand_format(title_tag['raw'].get_string()))
 
 
-    def get_component(self, key: str) -> amulet_nbt.AnyNBT:
+    def get_component(self, key: str):
         """
         Get a value from the `components` tag in this item.
 
@@ -503,7 +504,7 @@ class Item:
 
 
     @_check_components
-    def set_component(self, key: str, value: amulet_nbt.AnyNBT):
+    def set_component(self, key: str, value: CompoundTagVariant):
         """
         Set a custom component for this item.
 
